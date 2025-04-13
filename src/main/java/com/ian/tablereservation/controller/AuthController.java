@@ -2,7 +2,6 @@ package com.ian.tablereservation.controller;
 
 import com.ian.tablereservation.Service.AuthService;
 import com.ian.tablereservation.dto.Auth;
-import com.ian.tablereservation.dto.User;
 import com.ian.tablereservation.security.JwtTokenProvider;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +30,7 @@ public class AuthController {
      */
     @PostMapping("/signup")
     public ResponseEntity<?> signup(@RequestBody Auth.SignUp request) {
-        User user = authService.signup(request);
+        var user = authService.signup(request);
 
         log.info("회원 가입 성공 - username: {}", user.getUsername());
         return ResponseEntity.ok(user);
@@ -49,7 +48,7 @@ public class AuthController {
      */
     @PostMapping("/signin")
     public ResponseEntity<?> signin(@RequestBody Auth.SignIn request) {
-        User user = authService.signin(request);
+        var user = authService.signin(request);
         String token = jwtTokenProvider.generateToken(user.getUsername(), user.getRole());
 
         Auth.AuthResponse authResponse = new Auth.AuthResponse(user, token);

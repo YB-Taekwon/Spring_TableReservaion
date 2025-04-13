@@ -29,7 +29,7 @@ public class AuthService {
     @Transactional
     public User signup(Auth.SignUp request) {
         // 1. 아이디 중복 검사
-        if (existsUsername(request.getUsername()))
+        if (userRepository.existsByUsername(request.getUsername()))
             throw new RuntimeException("이미 사용 중인 아이디입니다.");
 
         // 아이디가 중복이 아닌 경우 회원 가입 처리
@@ -37,11 +37,6 @@ public class AuthService {
         UserEntity user = userRepository.save(request.toEntity());
 
         return user.toDto();
-    }
-
-    // 아이디 중복 검사
-    private boolean existsUsername(String username) {
-        return userRepository.existsByUsername(username);
     }
 
 
