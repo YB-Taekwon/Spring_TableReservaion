@@ -36,9 +36,11 @@ public class UserEntity implements UserDetails {
 
     public User toDto() {
         return User.builder()
+                .id(id)
                 .username(username)
                 .name(name)
                 .phone(phone)
+                .role(role)
                 .build();
     }
 

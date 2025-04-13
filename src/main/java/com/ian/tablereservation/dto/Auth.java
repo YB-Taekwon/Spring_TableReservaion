@@ -2,6 +2,7 @@ package com.ian.tablereservation.dto;
 
 import com.ian.tablereservation.entity.UserEntity;
 import com.ian.tablereservation.enums.Role;
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 public class Auth {
@@ -40,9 +41,9 @@ public class Auth {
     }
 
     @Data
+    @AllArgsConstructor
     public static class AuthResponse {
         private User user;
-        private Role role;
         private String token;
     }
 }

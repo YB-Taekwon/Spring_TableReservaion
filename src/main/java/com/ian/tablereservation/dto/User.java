@@ -1,5 +1,6 @@
 package com.ian.tablereservation.dto;
 
+import com.ian.tablereservation.enums.Role;
 import lombok.*;
 
 @Getter
@@ -9,7 +10,9 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class User {
+    private Long id;
     private String username;
     private String name;
     private String phone;
+    private Role role;
 }

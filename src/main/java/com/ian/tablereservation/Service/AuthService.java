@@ -1,7 +1,6 @@
 package com.ian.tablereservation.Service;
 
 import com.ian.tablereservation.dto.Auth;
-import com.ian.tablereservation.security.JwtTokenProvider;
 import com.ian.tablereservation.dto.User;
 import com.ian.tablereservation.entity.UserEntity;
 import com.ian.tablereservation.repository.UserRepository;
@@ -11,12 +10,13 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * AuthService: 요청으로 인해 직접 호출되는 서비스
- *  예시) 회원 가입, 로그인 -> 로그인 전 인증 요청
+ * 예시) 회원 가입, 로그인 -> 로그인 전 인증 요청
  * UserDetailsService: 스프링 내부에서 자동으로 호출되는 서비스
- *  예시) 내 정보 조회 -> 로그인 이후 인증 유지
+ * 예시) 내 정보 조회 -> 로그인 이후 인증 유지
  */
 @Slf4j
 @Service
@@ -24,50 +24,47 @@ import org.springframework.stereotype.Service;
 public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtTokenProvider jwtTokenProvider;
 
-    /**
-     * 회원 가입 메서드
-     *
-     * @param request
-     * @return
-     */
-    public User register(Auth.SignUp request) {
-        log.info(request.toString());
-
-        // 아이디 중복 검사
-        boolean exists = userRepository.existsByUsername(request.getUsername());
-        if (exists)
+    // 회원 가입 메서드
+    @Transactional
+    public User signup(Auth.SignUp request) {
+        // 1. 아이디 중복 검사
+        if (existsUsername(request.getUsername()))
             throw new RuntimeException("이미 사용 중인 아이디입니다.");
 
-        // 아이디가 중복이 아닌 경우 회원 가입 성공
+        // 아이디가 중복이 아닌 경우 회원 가입 처리
         request.setPassword(passwordEncoder.encode(request.getPassword())); // 비밀번호 암호화
         UserEntity user = userRepository.save(request.toEntity());
-
-        log.info(user.toString());
 
         return user.toDto();
     }
 
+    // 아이디 중복 검사
+    private boolean existsUsername(String username) {
+        return userRepository.existsByUsername(username);
+    }
 
-    /**
-     * 로그인 시 검증 메서드
-     *
-     * @param request
-     * @return
-     */
-    public String authenticate(Auth.SignIn request) {
-        log.info(request.toString());
 
-        // 아이디 확인 -> 아이디가 존재하지 않으면 예외 발생
-        UserEntity user = userRepository.findByUsername(request.getUsername())
+    // 로그인 메서드
+    public User signin(Auth.SignIn request) {
+        // 아이디 확인
+        UserEntity user = validateUsername(request.getUsername());
+
+        // 비밀번호 확인
+        validatePassword(request.getPassword(), user.getPassword());
+
+        return user.toDto();
+    }
+
+    // 아이디 확인 -> 아이디가 존재하지 않으면 예외 발생
+    private UserEntity validateUsername(String username) {
+        return userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
+    }
 
-        // 비밀번호 확인 -> 비밀번호가 일치하지 않으면 예외 발생
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword()))
+    // 비밀번호 확인 -> 비밀번호가 일치하지 않으면 예외 발생
+    private void validatePassword(String password1, String password2) {
+        if (passwordEncoder.matches(password1, password2))
             throw new BadCredentialsException("비밀번호가 일치하지 않습니다.");
-
-        // 로그인 성공 시 JWT 생성 및 반환
-        return jwtTokenProvider.generateToken(user.getUsername(), user.getRole());
     }
 }
