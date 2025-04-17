@@ -1,4 +1,4 @@
-package com.ian.tablereservation.Service;
+package com.ian.tablereservation.service;
 
 import com.ian.tablereservation.repository.UserRepository;
 import lombok.AllArgsConstructor;
@@ -20,8 +20,8 @@ public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        return this.userRepository.findByUsername(username)
+    public UserDetails loadUserByUsername(String phone) throws UsernameNotFoundException {
+        return this.userRepository.findByPhone(phone)
                 .orElseThrow(() -> new UsernameNotFoundException("사용자를 찾을 수 없습니다."));
     }
 }

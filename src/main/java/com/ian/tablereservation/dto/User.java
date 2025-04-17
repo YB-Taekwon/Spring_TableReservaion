@@ -11,8 +11,7 @@ import lombok.*;
 @Builder
 public class User {
     private Long id;
-    private String username;
-    private String name;
     private String phone;
+    private String name;
     private Role role;
 }

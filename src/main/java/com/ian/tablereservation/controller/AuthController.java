@@ -1,8 +1,9 @@
 package com.ian.tablereservation.controller;
 
-import com.ian.tablereservation.Service.AuthService;
+import com.ian.tablereservation.service.AuthService;
 import com.ian.tablereservation.dto.Auth;
 import com.ian.tablereservation.security.JwtTokenProvider;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -29,10 +30,11 @@ public class AuthController {
      * @return 회원 가입 성공 시 입력한 사용자 정보 그대로 반환
      */
     @PostMapping("/signup")
-    public ResponseEntity<?> signup(@RequestBody Auth.SignUp request) {
+    public ResponseEntity<?> signup(@RequestBody @Valid Auth.SignUp request) {
+        log.info("AuthController - signup start");
         var user = authService.signup(request);
 
-        log.info("회원 가입 성공 - username: {}", user.getUsername());
+        log.info("회원 가입 성공 - username: {}", user.getPhone());
         return ResponseEntity.ok(user);
     }
 
@@ -47,13 +49,14 @@ public class AuthController {
      * @return 로그인 성공 시 JWT 반환
      */
     @PostMapping("/signin")
-    public ResponseEntity<?> signin(@RequestBody Auth.SignIn request) {
+    public ResponseEntity<?> signin(@RequestBody @Valid Auth.SignIn request) {
+        log.info("AuthController - signin start");
         var user = authService.signin(request);
-        String token = jwtTokenProvider.generateToken(user.getUsername(), user.getRole());
+        String token = jwtTokenProvider.generateToken(user.getPhone(), user.getRole());
 
         Auth.AuthResponse authResponse = new Auth.AuthResponse(user, token);
 
-        log.info("로그인 성공 - username: {}", user.getUsername());
+        log.info("로그인 성공 - username: {}", user.getPhone());
         return ResponseEntity.ok(authResponse);
     }
 }

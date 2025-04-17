@@ -1,7 +1,7 @@
 package com.ian.tablereservation.security;
 
 import com.ian.tablereservation.enums.Role;
-import com.ian.tablereservation.Service.UserService;
+import com.ian.tablereservation.service.UserService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Jwts;
@@ -9,6 +9,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -20,6 +21,7 @@ import javax.crypto.SecretKey;
 import java.util.Base64;
 import java.util.Date;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class JwtTokenProvider {
@@ -40,18 +42,18 @@ public class JwtTokenProvider {
     }
 
     /**
-     * 주어진 사용자 명과 권한을 기반으로 JWT 토큰을 생성(발급)하는 메서드
+     * 주어진 사용자 명과 권한을 기반으로 JWT 토큰을 생성하는 메서드
      *
-     * @param username: 사용자 아이디
-     * @param role: 권한
+     * @param phone: 사용자 아이디 (전화번호)
+     * @param role:  권한
      * @return JWT 토큰을 문자열 형식으로 반환
      */
-    public String generateToken(String username, Role role) {
+    public String generateToken(String phone, Role role) {
         var now = new Date(); // 현재 시간
         var expiredDate = new Date(now.getTime() + TOKEN_EXPIRE_TIME); // 토큰 만료 간
 
         return Jwts.builder()
-                .subject(username) // 토큰의 주제(subject) 설정 -> 보통 사용자의 ID
+                .subject(phone) // 토큰의 주제(subject) 설정 -> 보통 사용자의 ID
                 .claim(KEY_ROLE, role) // 커스텀 클레임 추가 -> 사용자 권한 삽입
                 .setIssuedAt(now) // 토큰 생성 시간
                 .setExpiration(expiredDate) // 토큰 만료 시간
@@ -68,6 +70,7 @@ public class JwtTokenProvider {
      * @return Claims: JWT 내부에 담긴 정보를 꺼내는 객체 (예: 유저 아이디, 권한, 발급일 등)
      */
     private Claims getClaims(String token) {
+        log.info("Token to be parsed={}", token);
         // 토큰 분석 중 생길 수 있는 오류(토큰 만료 등)를 잡기 위해 예외 처리 사용
         try {
             return Jwts.parser()
@@ -111,7 +114,8 @@ public class JwtTokenProvider {
 
 
     public Authentication getAuthentication(String jwt) {
-        UserDetails userDetails = userService.loadUserByUsername(getUsername(jwt));
+        String phone = getUsername(jwt);
+        UserDetails userDetails = userService.loadUserByUsername(phone);
 
         return new UsernamePasswordAuthenticationToken(userDetails, "", userDetails.getAuthorities());
     }

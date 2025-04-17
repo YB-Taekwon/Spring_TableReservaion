@@ -15,6 +15,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
+/**
+ * 1. HTTP 요청 헤더에서 JWT 추출
+ * 2. 토큰 유효성 검증
+ * 3. 토큰이 유효하면 인증을 SecurityContext에 등록
+ * 4. 다음 필터로 요청 전달
+ */
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -25,10 +31,20 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
 
 
+    /**
+     *
+     * @param request
+     * @return
+     */
     private String resolveToken(HttpServletRequest request) {
-        String token = request.getHeader(TOKEN_HEADER);
+        log.info(request.getHeader("Authorization"));
 
+        // 요청 헤더에서 헤더 이름이 Authorization인 값 추출
+        String token = request.getHeader(TOKEN_HEADER); // Bearer {token} 형식
+
+        // 조건: Authorization 헤더가 NotBlank이면서 'Bearer '로 시작할 때
         if (!ObjectUtils.isEmpty(token) && token.startsWith(TOKEN_PREFIX))
+            // 앞에 붙은 'Bearer '를 제외한 나머지 토큰 (순수 JWT 문자열) 추출
             return token.substring(TOKEN_PREFIX.length());
 
         return null;
