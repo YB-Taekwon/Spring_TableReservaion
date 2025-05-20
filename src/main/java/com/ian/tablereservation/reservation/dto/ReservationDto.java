@@ -3,9 +3,7 @@ package com.ian.tablereservation.reservation.dto;
 import com.ian.tablereservation.reservation.domain.Reservation;
 import com.ian.tablereservation.reservation.domain.ReservationStatus;
 import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -17,34 +15,7 @@ public class ReservationDto {
     @NoArgsConstructor
     @AllArgsConstructor
     @Builder
-    public static class CreateReservationRequest {
-
-        @NotBlank
-        private Long storeId;
-
-        @NotNull
-        private Long tableId;
-
-        @NotNull
-        @Min(1)
-        private Integer numberOfPeople;
-
-        @NotNull
-        private LocalDate date;
-
-        @NotNull
-        private LocalTime time;
-
-        public LocalDateTime toDateTime() {
-            return LocalDateTime.of(date, time);
-        }
-    }
-
-    @Getter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class UpdateReservationRequest {
+    public static class ReservationRequest {
 
         @NotNull
         private Long tableId;

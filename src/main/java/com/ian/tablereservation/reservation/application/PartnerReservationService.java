@@ -4,11 +4,13 @@ import com.ian.tablereservation.common.security.CustomUserDetails;
 import com.ian.tablereservation.reservation.domain.Reservation;
 import com.ian.tablereservation.reservation.domain.ReservationRepository;
 import com.ian.tablereservation.reservation.dto.ReservationDto;
+import com.ian.tablereservation.store.domain.Store;
+import com.ian.tablereservation.store.domain.StoreRepository;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 
 import static com.ian.tablereservation.reservation.domain.ReservationStatus.*;
@@ -19,6 +21,7 @@ import static com.ian.tablereservation.reservation.domain.ReservationStatus.*;
 public class PartnerReservationService {
 
     private final ReservationRepository reservationRepository;
+    private final StoreRepository storeRepository;
 
 
     /**
@@ -33,14 +36,14 @@ public class PartnerReservationService {
      */
     @Transactional
     public ReservationDto.ReservationResponse approveReservation(
-            Long reservationId, CustomUserDetails user
+            Long storeId, Long reservationId, CustomUserDetails user
     ) {
         log.info("예약 승인 처리 시작: reservationId={}, manager={}", reservationId, user.getUsername());
 
-        Reservation reservation = findReservationOrThrow(reservationId);
+        Reservation reservation = findReservationOrThrow(reservationId, storeId);
         log.debug("예약 조회 성공: store={}, status={}", reservation.getStore().getName(), reservation.getStatus());
 
-        validateStoreManagerAccess(reservation, user);
+        validateStoreManagerAccess(storeId, user);
         isNotPending(reservation);
 
         reservation.updateStatus(CONFIRMED);
@@ -52,14 +55,14 @@ public class PartnerReservationService {
 
     @Transactional
     public ReservationDto.ReservationResponse rejectReservation(
-            Long reservationId, CustomUserDetails user
+            Long storeId, Long reservationId, CustomUserDetails user
     ) {
         log.info("예약 거절 처리 시작: reservationId={}, manager={}", reservationId, user.getUsername());
 
-        Reservation reservation = findReservationOrThrow(reservationId);
+        Reservation reservation = findReservationOrThrow(reservationId, storeId);
         log.debug("예약 조회 성공: store={}, status={}", reservation.getStore().getName(), reservation.getStatus());
 
-        validateStoreManagerAccess(reservation, user);
+        validateStoreManagerAccess(storeId, user);
         isNotPending(reservation);
 
         reservation.updateStatus(CANCELLED);
@@ -77,10 +80,10 @@ public class PartnerReservationService {
      * @return 예약 객체
      * @throws RuntimeException 예약 정보가 존재하지 않는 경우
      */
-    private Reservation findReservationOrThrow(Long reservationId) {
+    private Reservation findReservationOrThrow(Long reservationId, Long storeId) {
         log.debug("예약 조회 시도: ID={}", reservationId);
 
-        return reservationRepository.findByReservationId(reservationId)
+        return reservationRepository.findByReservationIdAndStore_StoreId(reservationId, storeId)
                 .orElseThrow(() -> {
                     log.error("예약 조회 실패 - 존재하지 않음: ID={}", reservationId);
                     return new RuntimeException("예약 정보를 찾을 수 없습니다.");
@@ -89,22 +92,28 @@ public class PartnerReservationService {
 
 
     /**
-     * 현재 점장이 해당 예약에 대한 승인/거절 권한을 가지고 있는지 확인합니다.
      *
-     * @param reservation 예약 정보
-     * @param user        현재 로그인한 점장
-     * @throws AccessDeniedException 점장이 예약된 가게의 소유자가 아닐 경우
+     * @param storeId
+     * @param user
      */
-    private static void validateStoreManagerAccess(Reservation reservation, CustomUserDetails user) {
-        String managerPhone = user.getUsername();
-        boolean hasAccess = user.getUser().getStores().contains(reservation.getStore());
+    private void validateStoreManagerAccess(Long storeId, CustomUserDetails user) {
+        log.debug("점장 권한 검증 시도: {}", user.getUsername());
 
-        if (!hasAccess) {
-            log.error("예약 접근 거부 - 점장 권한 없음: manager={}, store={}", managerPhone, reservation.getStore().getName());
+        Store store = storeRepository.findByStoreId(storeId)
+                .orElseThrow(() -> {
+                    log.error("");
+                    return new EntityNotFoundException("가게 정보를 찾을 수 없습니다.");
+                });
+
+        String ownerPhone = store.getUser().getPhone();
+        String requestUser = user.getUsername();
+
+        if (!ownerPhone.equals(requestUser)) {
+            log.error("예약 접근 거부 - 점장 권한 없음: 점장={}, 요청자={}", ownerPhone, requestUser);
             throw new AccessDeniedException("해당 작업을 수행할 권한이 없습니다.");
         }
 
-        log.debug("점장 권한 검증 성공: manager={}, store={}", managerPhone, reservation.getStore().getName());
+        log.debug("점장 권한 검증 성공: 점장={}, 요청자={}", ownerPhone, requestUser);
     }
 
 

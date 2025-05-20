@@ -1,6 +1,8 @@
 package com.ian.tablereservation.reservation.domain;
 
 import com.ian.tablereservation.common.base.BaseEntity;
+import com.ian.tablereservation.reservation.dto.ValidatedReservation;
+import com.ian.tablereservation.review.domain.Review;
 import com.ian.tablereservation.store.domain.Store;
 import com.ian.tablereservation.store.table.domain.StoreTable;
 import com.ian.tablereservation.user.domain.User;
@@ -46,14 +48,14 @@ public class Reservation extends BaseEntity {
     @JoinColumn(name = "table_id")
     private StoreTable table;
 
-    public void updateReservation(
-            StoreTable table, Integer numberOfPeople,
-            LocalDateTime startDateTime, LocalDateTime endDateTime
-    ) {
-        this.table = table;
-        this.numberOfPeople = numberOfPeople;
-        this.startDateTime = startDateTime;
-        this.endDateTime = endDateTime;
+    @OneToOne(mappedBy = "reservation", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private Review review;
+
+    public void updateReservation(ValidatedReservation validatedReservation) {
+        this.table = validatedReservation.table();
+        this.numberOfPeople = validatedReservation.numberOfPeople();
+        this.startDateTime = validatedReservation.start();
+        this.endDateTime = validatedReservation.end();
 
         if (status.canCheckin()) status = REQUESTED;
     }

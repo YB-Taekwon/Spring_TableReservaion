@@ -3,6 +3,7 @@ package com.ian.tablereservation.reservation.application;
 import com.ian.tablereservation.common.security.CustomUserDetails;
 import com.ian.tablereservation.reservation.dto.ReservationDto;
 import com.ian.tablereservation.reservation.domain.Reservation;
+import com.ian.tablereservation.reservation.dto.ValidatedReservation;
 import com.ian.tablereservation.store.domain.Store;
 import com.ian.tablereservation.store.table.domain.StoreTable;
 import com.ian.tablereservation.reservation.domain.ReservationRepository;
@@ -36,6 +37,7 @@ public class UserReservationService {
      * 사용자의 예약 생성 요청을 처리합니다.
      * 요청된 테이블과 시간대의 유효성을 검증하고, 예약 정보를 저장한 뒤 응답 DTO를 반환합니다.
      *
+     * @param storeId 가게 고유 ID
      * @param request 예약 생성 요청 정보
      * @param user    인증된 사용자 정보
      * @return 생성된 예약에 대한 응답 DTO
@@ -44,20 +46,12 @@ public class UserReservationService {
      */
     @Transactional
     public ReservationDto.ReservationResponse createReservation(
-            ReservationDto.CreateReservationRequest request, CustomUserDetails user
+            Long storeId, ReservationDto.ReservationRequest request, CustomUserDetails user
     ) {
         log.info("예약 생성 처리 시작: 사용자={}", user.getUsername());
-        Store store = findStoreOrThrow(request.getStoreId());
 
-        Long tableId = request.getTableId();
-        LocalDateTime start = request.toDateTime();
-        LocalDateTime end = start.plusMinutes(ALLOWED_TIME_UNIT_MINUTES);
-
-        log.debug("예약 요청 시간: 시작={}, 종료={}", start, end);
-
-        validateTableAvailability(tableId, start, end, request.getNumberOfPeople());
-
-        StoreTable table = findTableOrThrow(tableId);
+        Store store = findStoreOrThrow(storeId);
+        ValidatedReservation validatedReservation = extractValidatedReservation(storeId, request);
 
         Long reservationId = generateReservationId();
         log.debug("예약 번호 생성: 예약 번호={}", reservationId);
@@ -67,10 +61,10 @@ public class UserReservationService {
                         .reservationId(reservationId)
                         .store(store)
                         .user(user.getUser())
-                        .numberOfPeople(request.getNumberOfPeople())
-                        .startDateTime(start)
-                        .endDateTime(end)
-                        .table(table)
+                        .numberOfPeople(validatedReservation.numberOfPeople())
+                        .startDateTime(validatedReservation.start())
+                        .endDateTime(validatedReservation.end())
+                        .table(validatedReservation.table())
                         .status(REQUESTED)
                         .build()
         );
@@ -91,15 +85,18 @@ public class UserReservationService {
      * 특정 예약 정보를 상세 조회합니다.
      * 예약이 존재하지 않거나 예약자와 사용자 정보가 일치하지 않으면 예외를 발생시킵니다.
      *
+     * @param storeId       가게 고유 ID
      * @param reservationId 예약 고유 ID
      * @param user          인증된 사용자
      * @return 예약 상세 정보
      * @throws RuntimeException 예약이 존재하지 않거나 사용자 불일치 시
      */
-    public ReservationDto.ReservationResponse getReservation(Long reservationId, CustomUserDetails user) {
+    public ReservationDto.ReservationResponse getReservation(
+            Long storeId, Long reservationId, CustomUserDetails user
+    ) {
         log.info("예약 상세 조회 처리: 예약 ID={}", reservationId);
 
-        Reservation reservation = findReservationOrThrow(reservationId);
+        Reservation reservation = findReservationOrThrow(reservationId, storeId);
         validateReservationOwner(reservation, user);
 
         log.info("예약 조회 성공: 사용자={}, 예약 상태={}", user.getUsername(), reservation.getStatus());
@@ -110,6 +107,7 @@ public class UserReservationService {
     /**
      * 예약 정보를 수정합니다.
      *
+     * @param storeId       가게 고유 ID
      * @param reservationId 예약 고유 ID
      * @param request       예약 수정 요청 DTO
      * @param user          인증된 사용자
@@ -117,27 +115,19 @@ public class UserReservationService {
      */
     @Transactional
     public ReservationDto.ReservationResponse updateReservation(
+            Long storeId,
             Long reservationId,
-            ReservationDto.UpdateReservationRequest request,
+            ReservationDto.ReservationRequest request,
             CustomUserDetails user
     ) {
         log.info("예약 수정 처리 시작: 예약 ID={}", reservationId);
 
-        Reservation reservation = findReservationOrThrow(reservationId);
+        Reservation reservation = findReservationOrThrow(reservationId, storeId);
         validateReservationOwner(reservation, user);
 
-        Long tableId = request.getTableId();
-        LocalDateTime start = request.toDateTime();
-        LocalDateTime end = start.plusMinutes(ALLOWED_TIME_UNIT_MINUTES);
+        ValidatedReservation validatedReservation = extractValidatedReservation(storeId, request);
 
-        log.debug("예약 수정 요청 내용: 테이블={}, 시작={}, 종료={}, 인원={}",
-                tableId, start, end, request.getNumberOfPeople());
-
-        validateTableAvailability(tableId, start, end, request.getNumberOfPeople());
-
-        StoreTable table = findTableOrThrow(tableId);
-
-        reservation.updateReservation(table, request.getNumberOfPeople(), start, end);
+        reservation.updateReservation(validatedReservation);
 
         log.info("예약 수정 완료: 예약 ID={}", reservationId);
         return ReservationDto.ReservationResponse.from(reservation);
@@ -148,13 +138,16 @@ public class UserReservationService {
      * 예약 정보를 삭제합니다.
      * 예약이 존재하지 않거나 예약자와 사용자가 일치하지 않는 경우 예외를 발생시킵니다.
      *
+     * @param storeId       가게 고유 ID
      * @param reservationId 예약 고유 ID
      * @param user          인증된 사용자
      * @throws RuntimeException 예약이 존재하지 않거나 사용자 불일치 시
      */
-    public void deleteReservation(Long reservationId, CustomUserDetails user) {
+    public void deleteReservation(
+            Long storeId, Long reservationId, CustomUserDetails user
+    ) {
         log.info("예약 삭제 요청 처리 시작: 예약 ID={}, 사용자={}", reservationId, user.getUsername());
-        Reservation reservation = findReservationOrThrow(reservationId);
+        Reservation reservation = findReservationOrThrow(reservationId, storeId);
 
         validateReservationOwner(reservation, user);
 
@@ -167,18 +160,22 @@ public class UserReservationService {
      * 예약에 대한 체크인 처리를 수행합니다.
      * 예약 승인 상태가 아니거나 입장 시간이 아닌 경우 예외를 발생시킵니다.
      *
+     * @param storeId       가게 고유 ID
      * @param reservationId 예약 고유 ID
      * @param user          인증된 사용자
      * @return 체크인 완료된 예약 정보
      * @throws IllegalStateException 상태가 승인되지 않았거나, 입장 가능 시간이 아닐 경우
      */
-    public ReservationDto.ReservationResponse checkin(Long reservationId, CustomUserDetails user) {
+    @Transactional
+    public ReservationDto.ReservationResponse checkin(
+            Long storeId, Long reservationId, CustomUserDetails user
+    ) {
         log.info("체크인 요청 처리 시작: 예약 ID={}, 사용자={}", reservationId, user.getUsername());
 
-        Reservation reservation = findReservationOrThrow(reservationId);
+        Reservation reservation = findReservationOrThrow(reservationId, storeId);
         validateReservationOwner(reservation, user);
 
-        if (reservation.getStatus().canCheckin()) {
+        if (!reservation.getStatus().canCheckin()) {
             log.error("체크인 불가 - 현재 상태: {}", reservation.getStatus());
             throw new IllegalStateException("예약이 승인된 상태만 도착 확인이 가능합니다.");
         }
@@ -224,16 +221,18 @@ public class UserReservationService {
      * - 동일한 시간 대 중복 예약 불가
      * - 예약 인원이 테이블 수용 인원 이하
      *
-     * @param tableId        테이블 ID
-     * @param start          예약 시작 시간
-     * @param end            예약 종료 시간
-     * @param numberOfPeople 예약 인원
-     * @throws IllegalArgumentException 유효하지 않은 예약 조건
-     * @throws IllegalStateException    중복 예약 시
+     * @param storeId 가게 고유 ID
+     * @param request 예약 요청 객체
+     * @return 검증 완료된 예약 정보 record
      */
-    private void validateTableAvailability(
-            Long tableId, LocalDateTime start, LocalDateTime end, Integer numberOfPeople
+    private ValidatedReservation extractValidatedReservation(
+            Long storeId, ReservationDto.ReservationRequest request
     ) {
+        Long tableId = request.getTableId();
+        Integer numberOfPeople = request.getNumberOfPeople();
+        LocalDateTime start = request.toDateTime();
+        LocalDateTime end = start.plusMinutes(ALLOWED_TIME_UNIT_MINUTES);
+
         log.debug("테이블 예약 가능 여부 확인: 테이블 ID={}, 인원={}, 시작={}, 종료={}",
                 tableId, numberOfPeople, start, end);
 
@@ -254,13 +253,15 @@ public class UserReservationService {
             throw new IllegalStateException("해당 시간에는 예약이 불가능합니다.");
         }
 
-        StoreTable table = findTableOrThrow(tableId);
+        StoreTable table = findTableOrThrow(tableId, storeId);
+
         if (numberOfPeople > table.getCapacity()) {
             log.error("예약 실패 - 테이블 수용 인원 초과: 요청={}, 최대={}", numberOfPeople, table.getCapacity());
             throw new IllegalArgumentException("예약 인원이 테이블 수용 인원을 초과했습니다.");
         }
 
         log.debug("테이블 예약 가능");
+        return new ValidatedReservation(table, numberOfPeople, start, end);
     }
 
 
@@ -268,14 +269,15 @@ public class UserReservationService {
      * 예약 ID로 예약 정보를 조회합니다.
      * 예약 정보가 존재하지 않으면 예외를 발생시킵니다.
      *
+     * @param storeId       가게 고유 ID
      * @param reservationId 예약 고유 ID
      * @return 예약 객체
      * @throws RuntimeException 예약 정보가 존재하지 않는 경우
      */
-    private Reservation findReservationOrThrow(Long reservationId) {
+    private Reservation findReservationOrThrow(Long reservationId, Long storeId) {
         log.debug("예약 조회: ID={}", reservationId);
 
-        return reservationRepository.findByReservationId(reservationId)
+        return reservationRepository.findByReservationIdAndStore_StoreId(reservationId, storeId)
                 .orElseThrow(() -> {
                     log.error("예약 조회 실패 - 존재하지 않음: ID={}", reservationId);
                     return new RuntimeException("예약 정보를 찾을 수 없습니다.");
@@ -310,10 +312,10 @@ public class UserReservationService {
      * @return 테이블 엔티티
      * @throws RuntimeException 테이블 정보가 존재하지 않는 경우
      */
-    private StoreTable findTableOrThrow(Long tableId) {
+    private StoreTable findTableOrThrow(Long tableId, Long storeId) {
         log.debug("테이블 조회: ID={}", tableId);
 
-        return tableRepository.findById(tableId)
+        return tableRepository.findByIdAndStore_StoreId(tableId, storeId)
                 .orElseThrow(() -> {
                     log.error("테이블 조회 실패 - 존재하지 않음: ID={}", tableId);
                     return new RuntimeException("테이블을 찾을 수 없습니다.");
