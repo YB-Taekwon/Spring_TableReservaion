@@ -1,6 +1,8 @@
 package com.ian.tablereservation.store.domain;
 
 import com.ian.tablereservation.common.base.BaseEntity;
+import com.ian.tablereservation.reservation.domain.Reservation;
+import com.ian.tablereservation.review.domain.Review;
 import com.ian.tablereservation.store.table.domain.StoreTable;
 import com.ian.tablereservation.store.table.dto.StoreTableDto;
 import com.ian.tablereservation.user.domain.User;
@@ -40,6 +42,9 @@ public class Store extends BaseEntity {
 
     @OneToMany(mappedBy = "store", cascade = CascadeType.PERSIST, orphanRemoval = true)
     private List<StoreTable> tables = new ArrayList<>();
+
+    @OneToMany(mappedBy = "store", cascade = CascadeType.REMOVE, orphanRemoval = true)
+    private List<Review> reviews = new ArrayList<>();
 
     public void updateName(String name) {
         this.name = name;

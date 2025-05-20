@@ -28,7 +28,7 @@ public class StoreService {
     /**
      * 정렬 기준과 주소를 바탕으로 가게 목록을 조회합니다.
      *
-     * @param sort    정렬 기준 (가나다순 (default), 거리순, 별점순)
+     * @param sort    정렬 기준 (alphabet (default), distance, rating)
      * @param address 거리 정렬 시 기준이 되는 주소 (선택)
      * @return 정렬된 가게 응답 리스트
      * @throws RuntimeException 가게가 없거나 주소 정보가 잘못된 경우

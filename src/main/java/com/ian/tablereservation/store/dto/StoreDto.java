@@ -1,5 +1,6 @@
 package com.ian.tablereservation.store.dto;
 
+import com.ian.tablereservation.review.dto.ReviewDto;
 import com.ian.tablereservation.store.domain.Store;
 import com.ian.tablereservation.store.table.domain.StoreTable;
 import com.ian.tablereservation.store.table.dto.StoreTableDto;
@@ -8,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import lombok.*;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -52,6 +54,7 @@ public class StoreDto {
         private String name;
         private String address;
         private String description;
+        private Double rating;
 
         public static StoreResponse from(Store store) {
             return StoreResponse.builder()
@@ -59,6 +62,7 @@ public class StoreDto {
                     .name(store.getName())
                     .address(store.getAddress())
                     .description(store.getDescription())
+                    .rating(store.getRating() != null ? store.getRating() : 0.0)
                     .build();
         }
     }
@@ -77,6 +81,8 @@ public class StoreDto {
         private String description;
         private String owner;
         private List<StoreTableDto> tables;
+        private Double rating;
+        private List<ReviewDto.ReviewResponse> reviews;
 
         public static StoreInfoResponse from(Store store) {
             return StoreInfoResponse.builder()
@@ -89,6 +95,11 @@ public class StoreDto {
                     .owner(store.getUser().getName())
                     .tables(store.getTables().stream()
                             .map(StoreTableDto::from)
+                            .toList()
+                    )
+                    .rating(store.getRating() != null ? store.getRating() : 0.0)
+                    .reviews(store.getReviews().stream()
+                            .map(ReviewDto.ReviewResponse::from)
                             .toList()
                     )
                     .build();
